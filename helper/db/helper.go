@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgconn"
+	sqlite "github.com/glebarez/go-sqlite"
 	"gorm.io/gorm"
 )
 
@@ -31,54 +31,49 @@ func IsRecordNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }
 
-// IsUniqueViolation reports whether err is a Postgres unique_violation (SQLSTATE 23505).
-// If constraintOrColumn is non-empty it must appear (case-insensitive) in the constraint name,
-// message, or detail of the violation. Pass "" to match any unique violation.
-func IsUniqueViolation(err error, constraintOrColumn string) bool {
+// asSQLiteError unwraps err into a *sqlite.Error if possible.
+func asSQLiteError(err error) (*sqlite.Error, bool) {
 	if err == nil {
-		return false
+		return nil, false
 	}
-
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
-		return false
+	var sqliteErr *sqlite.Error
+	if !errors.As(err, &sqliteErr) {
+		return nil, false
 	}
-	if pgErr.Code != "23505" {
-		return false
-	}
-	if constraintOrColumn == "" {
-		return true
-	}
-
-	needle := strings.ToLower(constraintOrColumn)
-	return strings.Contains(strings.ToLower(pgErr.ConstraintName), needle) ||
-		strings.Contains(strings.ToLower(pgErr.Message), needle) ||
-		strings.Contains(strings.ToLower(pgErr.Detail), needle)
+	return sqliteErr, true
 }
 
-// IsForeignKeyViolation reports whether err is a Postgres foreign_key_violation (SQLSTATE 23503).
-// If constraintOrColumn is non-empty it must appear (case-insensitive) in the constraint name,
-// message, or detail of the violation. Pass "" to match any FK violation.
-func IsForeignKeyViolation(err error, constraintOrColumn string) bool {
-	if err == nil {
+// IsUniqueViolation reports whether err is a SQLite UNIQUE/PRIMARY KEY constraint violation.
+// SQLite's message includes the offending "table.column", so if constraintOrColumn is non-empty
+// it must appear (case-insensitive) in the message. Pass "" to match any unique violation.
+func IsUniqueViolation(err error, constraintOrColumn string) bool {
+	sqliteErr, ok := asSQLiteError(err)
+	if !ok {
 		return false
 	}
 
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
-		return false
-	}
-	if pgErr.Code != "23503" {
+	msg := strings.ToLower(sqliteErr.Error())
+	if !strings.Contains(msg, "unique constraint failed") {
 		return false
 	}
 	if constraintOrColumn == "" {
 		return true
 	}
 
-	needle := strings.ToLower(constraintOrColumn)
-	return strings.Contains(strings.ToLower(pgErr.ConstraintName), needle) ||
-		strings.Contains(strings.ToLower(pgErr.Message), needle) ||
-		strings.Contains(strings.ToLower(pgErr.Detail), needle)
+	return strings.Contains(msg, strings.ToLower(constraintOrColumn))
+}
+
+// IsForeignKeyViolation reports whether err is a SQLite FOREIGN KEY constraint violation.
+// Unlike Postgres, SQLite's FK error carries NO constraint or column name — so constraintOrColumn
+// cannot be matched and is ignored. Callers that need to know which FK failed must disambiguate
+// another way (e.g. only one FK on the insert).
+func IsForeignKeyViolation(err error, _ string) bool {
+	sqliteErr, ok := asSQLiteError(err)
+	if !ok {
+		return false
+	}
+
+	return strings.Contains(strings.ToLower(sqliteErr.Error()), "foreign key constraint failed")
 }
 
 func (db *DB) checkIfNotNull(value any) bool {
