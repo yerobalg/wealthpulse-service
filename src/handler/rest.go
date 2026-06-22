@@ -91,13 +91,6 @@ func (r *rest) RegisterMiddlewareAndRoutes() {
 	authorized.GET("/user", r.AuthorizePermission(entity.PermissionManageUser), r.GetListUser)
 	authorized.POST("/user", r.AuthorizePermission(entity.PermissionManageUser), r.CreateUser)
 	authorized.PUT("/user/:id", r.AuthorizePermission(entity.PermissionManageUser), r.UpdateUser)
-
-	// Sample resource (item) — reference CRUD; delete when scaffolding your own.
-	authorized.GET("/item", r.GetListItem)
-	authorized.GET("/item/:id", r.GetItemDetail)
-	authorized.POST("/item", r.AuthorizePermission(entity.PermissionManageItem), r.CreateItem)
-	authorized.PUT("/item/:id", r.AuthorizePermission(entity.PermissionManageItem), r.UpdateItem)
-	authorized.DELETE("/item/:id", r.AuthorizePermission(entity.PermissionManageItem), r.DeleteItem)
 }
 
 func (r *rest) setupSwagger() {

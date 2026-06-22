@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"go.pitz.tech/gorm/encryption"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	"github.com/yerobalg/wealthpulse-service/helper/logger"
@@ -24,15 +24,11 @@ type PoolConfig struct {
 }
 
 type Credential struct {
-	Host     string
-	Port     string
-	Username string
-	Password string
-	DBName   string
+	Path string
 }
 
 func Init(serverLogger logger.Interface, cred Credential, poolConfig PoolConfig, encryptionKeyB64 string) (*DB, error) {
-	db, err := initPostgres(serverLogger, cred, poolConfig)
+	db, err := initSQLite(serverLogger, cred, poolConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -48,17 +44,15 @@ func Init(serverLogger logger.Interface, cred Credential, poolConfig PoolConfig,
 	return &DB{db}, nil
 }
 
-func initPostgres(serverLogger logger.Interface, cred Credential, poolConfig PoolConfig) (*gorm.DB, error) {
+func initSQLite(serverLogger logger.Interface, cred Credential, poolConfig PoolConfig) (*gorm.DB, error) {
+	// Enable foreign keys (off by default in SQLite), WAL for concurrent reads, and a
+	// busy timeout so the in-process scheduler and HTTP handlers don't trip over each other.
 	dataSourceName := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=Asia/Jakarta",
-		cred.Host,
-		cred.Port,
-		cred.Username,
-		cred.Password,
-		cred.DBName,
+		"file:%s?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)",
+		cred.Path,
 	)
 
-	db, err := gorm.Open(postgres.Open(dataSourceName), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dataSourceName), &gorm.Config{
 		Logger: InitGormLogger(serverLogger),
 	})
 	if err != nil {

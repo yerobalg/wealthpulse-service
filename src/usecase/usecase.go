@@ -19,7 +19,6 @@ type Usecase struct {
 	User         UserInterface
 	ActivityLog  ActivityLogInterface
 	RevokedToken RevokedTokenInterface
-	Item         ItemInterface
 }
 
 type InitParam struct {
@@ -51,10 +50,5 @@ func Init(param InitParam) *Usecase {
 		User:         InitUser(userParam),
 		ActivityLog:  activityLog,
 		RevokedToken: InitRevokedToken(param.Repository.RevokedToken),
-		Item: InitItem(ItemInitParam{
-			ItemRepo:    param.Repository.Item,
-			Validator:   validator,
-			ActivityLog: activityLog,
-		}),
 	}
 }

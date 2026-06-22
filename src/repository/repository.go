@@ -10,7 +10,6 @@ type Repository struct {
 	Permission   PermissionInterface
 	RevokedToken RevokedTokenInterface
 	ActivityLog  ActivityLogInterface
-	Item         ItemInterface
 }
 
 func Init(dbConn db.DB) *Repository {
@@ -20,6 +19,5 @@ func Init(dbConn db.DB) *Repository {
 		Permission:   InitPermission(dbConn),
 		RevokedToken: InitRevokedToken(dbConn),
 		ActivityLog:  InitActivityLog(dbConn),
-		Item:         InitItem(dbConn),
 	}
 }

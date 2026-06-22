@@ -53,11 +53,7 @@ func initialize() {
 
 	// db
 	dbCred := db.Credential{
-		Host:     os.Getenv("DB_HOST"),
-		Port:     os.Getenv("DB_PORT"),
-		Username: os.Getenv("DB_USERNAME"),
-		Password: os.Getenv("DB_PASSWORD"),
-		DBName:   os.Getenv("DB_DBNAME"),
+		Path: os.Getenv("DB_PATH"),
 	}
 	dbConnectionPool := getDBConnectionPool(ctx, logger)
 	database, err := db.Init(logger, dbCred, dbConnectionPool, os.Getenv("DB_ENCRYPTION_KEY"))

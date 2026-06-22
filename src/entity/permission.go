@@ -23,6 +23,8 @@ type PermissionResponse struct {
 }
 
 const (
-	PermissionManageUser = "manageUser"
-	PermissionManageItem = "manageItem"
+	PermissionManageUser        = "manageUser"
+	PermissionManagePortfolio   = "managePortfolio"
+	PermissionManageTransaction = "manageTransaction"
+	PermissionManageAlert       = "manageAlert"
 )
