@@ -1,5 +1,8 @@
 -include .env
 
+# Exported so goose ENVSUB can substitute them in the superuser seed migration.
+export SUPERUSER_USERNAME SUPERUSER_PASSWORD_HASH SUPERUSER_NAME
+
 install-goose:
 	go install github.com/pressly/goose/v3/cmd/goose@latest
 
@@ -7,7 +10,7 @@ install-swag:
 	go install github.com/swaggo/swag/cmd/swag@latest
 
 migrate:
-	goose -dir docs/sql postgres "host=$(DB_HOST) port=$(DB_PORT) user=$(DB_USERNAME) password=$(DB_PASSWORD) dbname=$(DB_DBNAME) sslmode=disable" up
+	goose -dir docs/sql sqlite3 "$(DB_PATH)" up
 
 swagger:
 	swag init -o ./docs/api

@@ -16,21 +16,10 @@ FROM roles r
 CROSS JOIN permissions p
 WHERE r.code = 'admin';
 
--- Initial admin user (username: admin / password: admin123)
-INSERT INTO users (username, password, name, is_male, role_id, has_changed_password, created_at, updated_at)
-SELECT 'admin',
-       '$2a$08$LtrZK9DGlxsYuUxNf.1cu.CHnG2acwUy9cZgbZHPfjK09WiCmwDca',
-       'Administrator',
-       TRUE,
-       r.id,
-       FALSE,
-       EXTRACT(EPOCH FROM NOW())::BIGINT,
-       EXTRACT(EPOCH FROM NOW())::BIGINT
-FROM roles r
-WHERE r.code = 'admin';
+-- The single WealthPulse owner is seeded separately from environment variables
+-- in 20260616000003_seed_superuser.sql — no hardcoded user is created here.
 
 -- +goose Down
-DELETE FROM users WHERE username = 'admin';
 DELETE FROM role_permissions
     WHERE role_id IN (SELECT id FROM roles WHERE code = 'admin');
 DELETE FROM permissions WHERE code IN ('manageUser', 'manageItem');
