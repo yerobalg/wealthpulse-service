@@ -92,11 +92,14 @@ scheduler loop all run in one process.
 The boilerplate's full auth/RBAC stack (login, JWT, roles, permissions, revoked tokens, activity
 log) is **kept as-is**. WealthPulse is single-owner, so we do **not** expose user self-registration
 or user management as a product feature — instead **exactly one superuser is seeded from
-environment variables** via a goose migration (§6.3, §12).
+environment variables at startup** (§12).
 
-- A goose seed migration inserts one `admin`-role user whose username, bcrypt password hash, and
-  name come from the environment using goose's `ENVSUB` substitution. The boilerplate's hardcoded
-  `admin` user seed is removed so this env-seeded user is the only account.
+- On boot, `main.go` runs an idempotent seed (`usecase.User.EnsureSuperuser`): if the user does not
+  exist, it reads `SUPERUSER_USERNAME` / `SUPERUSER_PASSWORD_HASH` / `SUPERUSER_NAME` via `os.Getenv`
+  and inserts the `admin`-role owner, storing the **pre-bcrypt-hashed** password verbatim (no
+  re-hashing). Reading the hash with `os.Getenv` returns it literally, so the `$` in a bcrypt hash
+  needs no escaping (the value never passes through `make`/goose substitution). The boilerplate's
+  hardcoded `admin` user seed is removed so this env-seeded user is the only account.
 - No second user is ever created through the API for this product.
 - `POST /user/login`, JWT issuance, `Authorization()` middleware, and `AuthorizePermission(...)`
   remain the gate for every portfolio endpoint.
@@ -264,8 +267,8 @@ DROP TABLE IF EXISTS asset_types;
 
 - **`<ts>_seed_portfolio_data.sql`** — the six `asset_types` with default `target_allocation`
   (crypto 20%, idx 30%, us 20%, precious_metal 15%, bonds 15%, cash 0%) and the new permissions (§11).
-- **`<ts>_seed_superuser.sql`** — the single owner, from env via goose `ENVSUB` (§12). Created at
-  [docs/sql/20260616000003_seed_superuser.sql](../sql/20260616000003_seed_superuser.sql).
+- The single owner is **not** seeded via SQL — it is created idempotently at app startup from env
+  (see §4 and §12).
 
 ### 6.4 SQLite caveats (handle in Slice 0)
 
@@ -442,9 +445,9 @@ Replace the Postgres DB_* vars with a single SQLite path, and extend with provid
 # Database (SQLite file on the mounted volume)
 DB_PATH=./data/wealthpulse.db
 
-# Single seeded superuser (consumed by the goose ENVSUB seed migration)
+# Single seeded superuser (created idempotently at startup from the env hash)
 SUPERUSER_USERNAME=
-SUPERUSER_PASSWORD_HASH=        # bcrypt hash from `make gen-password` — see note below
+SUPERUSER_PASSWORD_HASH=        # bcrypt hash from `make gen-password` (single-quote it — see below)
 SUPERUSER_NAME=
 
 # Market-data providers
@@ -465,16 +468,16 @@ PREFERRED_CURRENCY=IDR          # IDR | USD (display default)
 YOY_TARGET=15                   # annual return target, percent
 ```
 
-**Superuser seeding mechanism:** the migration
-[docs/sql/20260616000003_seed_superuser.sql](../sql/20260616000003_seed_superuser.sql) uses goose's
-`-- +goose ENVSUB ON` directive to substitute `${SUPERUSER_USERNAME}`, `${SUPERUSER_PASSWORD_HASH}`,
-and `${SUPERUSER_NAME}` from the process environment at `goose up` time. The Makefile `migrate`
-target `export`s these three variables so goose sees them.
+**Superuser seeding mechanism:** at startup `main.go` calls `usecase.User.EnsureSuperuser`, which —
+if the user does not already exist — inserts the `admin`-role owner using the pre-bcrypt-hashed
+`SUPERUSER_PASSWORD_HASH` read via `os.Getenv` (stored verbatim, never re-hashed). It is idempotent
+(a no-op once the user exists). The hash is **not** routed through `make` or goose, so it needs no
+escaping — `os.Getenv` returns the literal string.
 
-> **bcrypt `$` caveat:** a bcrypt hash contains `$` (`$2a$08$...`). Because the Makefile loads
-> `.env` via `-include`, `make` will interpret `$` as a variable reference. Write the hash in `.env`
-> with **doubled dollars** (`$$2a$$08$$...`) so `make` expands it back to a single `$` before
-> exporting. (Only `make`/goose consume this value; the running Go app never reads it.)
+> **bcrypt `$` in `.env` (dev only):** when running locally with a `.env`, `godotenv` expands `$` in
+> unquoted/double-quoted values, which would corrupt the hash. **Single-quote** it
+> (`SUPERUSER_PASSWORD_HASH='$2a$08$...'`) — godotenv keeps single-quoted values literal. In
+> production the container sets the variable directly, so there is nothing to escape.
 
 ---
 
@@ -489,8 +492,8 @@ Build one resource end-to-end before the next; **commit per layer** (per CLAUDE.
 - [ ] Convert existing boilerplate migrations to SQLite; Makefile `migrate` → `sqlite3` dialect
 - [ ] Rework `helper/db.IsForeignKeyViolation` for SQLite extended error codes (§6.4)
 - [ ] Add `github.com/shopspring/decimal`; `helper/httpclient` shared HTTP wrapper
-- [ ] `docs/sql`: portfolio tables + asset_type/permission seed + **env superuser seed**;
-      remove the boilerplate hardcoded `admin` user
+- [ ] `docs/sql`: portfolio tables + asset_type/permission seed; remove the boilerplate hardcoded
+      `admin` user. Seed the single owner at startup via `EnsureSuperuser` (no SQL seed)
 - [ ] `entity/permission.go`: replace item/user perms with portfolio perms
 - [ ] Remove sample `item` resource (entity/repo/usecase/handler/routes/validation/migration)
 

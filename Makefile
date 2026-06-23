@@ -1,8 +1,5 @@
 -include .env
 
-# Exported so goose ENVSUB can substitute them in the superuser seed migration.
-export SUPERUSER_USERNAME SUPERUSER_PASSWORD_HASH SUPERUSER_NAME
-
 install-goose:
 	go install github.com/pressly/goose/v3/cmd/goose@latest
 

@@ -23,6 +23,7 @@ type UserInterface interface {
 	CreateUser(ctx context.Context, req entity.CreateUserRequest) (entity.User, error)
 	UpdateUser(ctx context.Context, req entity.UpdateUserRequest) error
 	GetList(ctx context.Context, req entity.GetListUserRequest) ([]entity.UserListResponse, *entity.PaginationResponse, error)
+	EnsureSuperuser(ctx context.Context, req entity.EnsureSuperuserRequest) error
 }
 
 type user struct {
@@ -234,6 +235,41 @@ func (u *user) CreateUser(ctx context.Context, req entity.CreateUserRequest) (en
 	})
 
 	return newUser, nil
+}
+
+// EnsureSuperuser idempotently seeds the single owner at startup from env. It
+// inserts the user with the admin role only if the username does not already
+// exist, storing the pre-hashed password verbatim (no re-hashing). No activity
+// log is emitted: this runs at boot with no authenticated user or request context.
+func (u *user) EnsureSuperuser(ctx context.Context, req entity.EnsureSuperuserRequest) error {
+	if req.Username == "" || req.PasswordHash == "" {
+		return nil
+	}
+
+	_, err := u.userRepo.Get(ctx, entity.UserRequest{Username: req.Username})
+	if err == nil {
+		return nil
+	}
+	if !errorLib.Is(err, errorLib.TypeNotFound) {
+		return err
+	}
+
+	role, err := u.roleRepo.GetByCode(ctx, entity.RoleCodeAdmin)
+	if err != nil {
+		return err
+	}
+
+	newUser := entity.User{
+		Username:           req.Username,
+		Password:           req.PasswordHash,
+		Name:               req.Name,
+		IsMale:             &req.IsMale,
+		RoleID:             role.ID,
+		HasChangedPassword: types.SafelyReference(true),
+		IsInactive:         types.SafelyReference(false),
+	}
+
+	return u.userRepo.Create(ctx, &newUser)
 }
 
 func (u *user) GetList(ctx context.Context, req entity.GetListUserRequest) ([]entity.UserListResponse, *entity.PaginationResponse, error) {

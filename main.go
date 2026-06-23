@@ -13,6 +13,7 @@ import (
 	"github.com/yerobalg/wealthpulse-service/helper/db"
 	"github.com/yerobalg/wealthpulse-service/helper/logger"
 
+	"github.com/yerobalg/wealthpulse-service/src/entity"
 	"github.com/yerobalg/wealthpulse-service/src/handler"
 	"github.com/yerobalg/wealthpulse-service/src/repository"
 	"github.com/yerobalg/wealthpulse-service/src/usecase"
@@ -80,6 +81,11 @@ func initialize() {
 		Log:        logger,
 		TxManager:  database,
 	})
+	if err := seedSuperuser(ctx, usecase); err != nil {
+		logger.Fatal(ctx, "failed to seed superuser", err)
+		panic(err)
+	}
+
 	handler := handler.Init(handler.InitParam{
 		Log:     logger,
 		JWT:     jwt,
@@ -90,6 +96,18 @@ func initialize() {
 	})
 
 	handler.Run()
+}
+
+// seedSuperuser idempotently creates the single owner from the environment. The
+// pre-bcrypt-hashed SUPERUSER_PASSWORD_HASH is read verbatim (os.Getenv does not
+// interpret '$', so the hash needs no escaping) and stored as-is.
+func seedSuperuser(ctx context.Context, uc *usecase.Usecase) error {
+	return uc.User.EnsureSuperuser(ctx, entity.EnsureSuperuserRequest{
+		Username:     os.Getenv("SUPERUSER_USERNAME"),
+		Name:         os.Getenv("SUPERUSER_NAME"),
+		PasswordHash: os.Getenv("SUPERUSER_PASSWORD_HASH"),
+		IsMale:       true,
+	})
 }
 
 func getEnvAsInt(ctx context.Context, logger logger.Interface, key string) int {
