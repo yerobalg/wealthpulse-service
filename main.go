@@ -56,7 +56,7 @@ func initialize() {
 		Path: os.Getenv("DB_PATH"),
 	}
 	dbConnectionPool := getDBConnectionPool(ctx, logger)
-	database, err := db.Init(logger, dbCred, dbConnectionPool, os.Getenv("DB_ENCRYPTION_KEY"))
+	database, err := db.Init(logger, dbCred, dbConnectionPool)
 	if err != nil {
 		logger.Fatal(ctx, "failed to connect to database", err)
 		panic(err)
