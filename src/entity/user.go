@@ -85,6 +85,17 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"newPassword" validate:"required,min=8,printascii,containsany=0123456789,containsany=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"`
 }
 
+// EnsureSuperuserRequest carries the single-owner credentials read from the
+// environment at startup. PasswordHash is an already-bcrypt-hashed value (read
+// verbatim via os.Getenv, so the '$' in the hash needs no escaping) and is stored
+// as-is — it is never re-hashed.
+type EnsureSuperuserRequest struct {
+	Username     string
+	Name         string
+	PasswordHash string
+	IsMale       bool
+}
+
 type CreateUserRequest struct {
 	Name     string `json:"name" validate:"required,max=255"`
 	IsMale   bool   `json:"isMale"`

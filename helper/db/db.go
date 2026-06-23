@@ -1,12 +1,10 @@
 package db
 
 import (
-	"encoding/base64"
 	"fmt"
 	"time"
 
 	"github.com/glebarez/sqlite"
-	"go.pitz.tech/gorm/encryption"
 	"gorm.io/gorm"
 
 	"github.com/yerobalg/wealthpulse-service/helper/logger"
@@ -27,18 +25,10 @@ type Credential struct {
 	Path string
 }
 
-func Init(serverLogger logger.Interface, cred Credential, poolConfig PoolConfig, encryptionKeyB64 string) (*DB, error) {
+func Init(serverLogger logger.Interface, cred Credential, poolConfig PoolConfig) (*DB, error) {
 	db, err := initSQLite(serverLogger, cred, poolConfig)
 	if err != nil {
 		return nil, err
-	}
-
-	key, err := base64.StdEncoding.DecodeString(encryptionKeyB64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid encryption key: %w", err)
-	}
-	if err := encryption.Register(db, encryption.WithKey(key), encryption.WithMigration()); err != nil {
-		return nil, fmt.Errorf("failed to register encryption serializer: %w", err)
 	}
 
 	return &DB{db}, nil
