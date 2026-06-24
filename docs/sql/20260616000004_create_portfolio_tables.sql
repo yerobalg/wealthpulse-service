@@ -25,10 +25,13 @@ CREATE TABLE assets (
     asset_type_id INTEGER NOT NULL,
     name          TEXT NOT NULL,
     ticker        TEXT NOT NULL,
+    unique_id     TEXT NOT NULL,                -- stable unique key per asset
+    image_url     TEXT NULL,                    -- asset logo/icon url
     external_id   TEXT NULL,                    -- provider id (e.g. coingecko "bitcoin")
     CONSTRAINT fk_assets_asset_type FOREIGN KEY (asset_type_id) REFERENCES asset_types (id)
 );
-CREATE UNIQUE INDEX idx_assets_ticker ON assets (ticker);
+CREATE UNIQUE INDEX idx_assets_unique_id ON assets (unique_id);
+CREATE INDEX idx_assets_ticker ON assets (ticker);
 CREATE INDEX idx_assets_asset_type_id ON assets (asset_type_id);
 CREATE INDEX idx_assets_deleted_at ON assets (deleted_at);
 
