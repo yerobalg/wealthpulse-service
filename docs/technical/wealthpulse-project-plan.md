@@ -497,26 +497,41 @@ Build one resource end-to-end before the next; **commit per layer** (per CLAUDE.
 - [ ] `entity/permission.go`: replace item/user perms with portfolio perms
 - [ ] Remove sample `item` resource (entity/repo/usecase/handler/routes/validation/migration)
 
-### Slice 1 — Asset types & assets (reference data)
-- [ ] entity → repository → usecase → handler/routes; `GET/PUT /asset-type`, `GET/POST /asset`
+### Slice 1 — Third-party asset integration (provider repositories)
+- [ ] Portfolio entity structs (`AssetType`, `Asset`, `AssetPrice`, `Transaction`, `Alert`,
+      `AssetValue`), one file per table, explicit FKs, pointers for zero-meaningful columns
+- [ ] `assets` schema: add `unique_id` (UNIQUE) + `image_url`; `ticker` index becomes non-unique
+- [ ] `helper/httpclient` array decoding (`GetJSONArray`) for array-returning providers
+      (CoinGecko `/coins/markets`)
+- [ ] Provider repos behind interfaces, each on `helper/httpclient` + config (base URL / API key):
+      CoinGecko (crypto prices + ticker search), ExchangeRate (USD↔IDR), Yahoo Finance (IDX/US),
+      MetalPrice (precious metals); wired into `repository.Init`
 - [ ] PR doc with English Test Plan
+- [ ] **Milestone:** can fetch live prices and search assets from each provider
 
-### Slice 2 — Transactions (the ledger)
-- [ ] CRUD + paginated list with date-range filter; activity log on create/delete
+### Slice 2 — Transactions & assets (the ledger)
+- [ ] Recording a transaction **and** creating its asset are a single combined action: one request
+      upserts the `Asset` from the chosen provider result (`unique_id`, `image_url`, ticker, type),
+      then records the buy/sell against it — no separate "create asset" step
+- [ ] Transaction CRUD + `PUT /asset-type/:id` target allocation; activity log on create/delete
+- [ ] `POST/DELETE /transaction` (asset upsert happens inside the transaction create)
 - [ ] **Milestone:** can record a real portfolio via API
 
-### Slice 3 — Portfolio computation
+### Slice 3 — Scheduler price update & portfolio computation
+- [ ] Price-fetch usecase + value-snapshot usecase; scheduler loop wired into `main.go`
+      (runs once at boot, then on interval; graceful shutdown)
 - [ ] `PortfolioInterface` usecase (holdings, allocation, P&L, summary) using `decimal`
-- [ ] `GET /portfolio`, `/portfolio/summary` (prices read from `asset_prices`, manual until Slice 4)
+- [ ] `GET /portfolio`, `/portfolio/summary`, `/portfolio/history`, `/price`, `/price/history`
+- [ ] **Milestone:** live P&L, allocation, and growth snapshots
 
-### Slice 4 — Market-data repositories + in-process scheduler
-- [ ] CoinGecko / Yahoo / MetalPrice / ExchangeRate repos (interfaces + `helper/httpclient` impls)
-- [ ] Price-fetch usecase + value-snapshot usecase
-- [ ] Scheduler loop wired into `main.go` (runs once at boot, then on interval; graceful shutdown)
-- [ ] `GET /price`, `/price/history`, `/portfolio/history`, `GET /asset/search`
-- [ ] **Milestone:** live P&L, allocation, sparkline data, ticker autocomplete
+### Slice 4 — Displaying transactions & assets (incl. search)
+- [ ] Paginated read endpoints for assets and transactions (whitelisted `search_by`, date-range
+      filter); provider-backed ticker autocomplete
+- [ ] `GET /asset`, `GET /asset/search`, `GET /transaction`, `GET /transaction/:id`,
+      `GET /asset-type`
+- [ ] **Milestone:** dashboard list/detail reads + ticker autocomplete
 
-### Slice 5 — Telegram alerts
+### Slice 5 — Telegram bot alert CRUD
 - [ ] Telegram repo (`sendMessage` via `helper/httpclient`) + alert CRUD + alert engine in the fetch job
 - [ ] `POST/GET/PATCH/DELETE /alert`; re-arm/cooldown logic; activity log on alert writes
 - [ ] **Milestone:** threshold breach → Telegram message
