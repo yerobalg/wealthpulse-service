@@ -1,4 +1,4 @@
-# CoinGecko Asset Price Integration
+# Slice 1.1 — CoinGecko Asset Price Integration
 
 ## Summary
 
@@ -9,7 +9,8 @@ with `unique_id` (unique) and `image_url`, and teaches the HTTP gateway to decod
 responses (CoinGecko returns an array, not an object).
 
 See [docs/technical/wealthpulse-project-plan.md](../technical/wealthpulse-project-plan.md) for the
-full plan.
+full plan; this PR is **Slice 1.1** — the CoinGecko provider — within **Slice 1 (Third-party asset
+integration)**.
 
 ## Changes
 

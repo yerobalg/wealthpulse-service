@@ -301,7 +301,7 @@ and usecases wrap them as `errorLib.InternalServerError("")`.
 
 | Provider repo | File | Used for | Returns |
 |---|---|---|---|
-| `CoinGeckoInterface` | `repository/coingecko.go` | crypto prices + ticker search | price USD, provider id |
+| `AssetPriceInterface` | `repository/asset_price.go` | crypto prices + ticker search (CoinGecko) | `[]entity.CryptoPrice` |
 | `YahooFinanceInterface` | `repository/yahoo_finance.go` | IDX (`.JK`), US stocks/ETFs | price (native ccy) |
 | `MetalPriceInterface` | `repository/metal_price.go` | precious metals (XAU, XAG) | price USD |
 | `ExchangeRateInterface` | `repository/exchange_rate.go` | USD↔IDR rate | rate |
@@ -310,9 +310,10 @@ and usecases wrap them as `errorLib.InternalServerError("")`.
 Suggested interface shape (mirrors DB repo style):
 
 ```go
-type CoinGeckoInterface interface {
-    GetPrices(ctx context.Context, externalIDs []string) (map[string]entity.ProviderPrice, error)
-    Search(ctx context.Context, query string) ([]entity.ProviderSearchResult, error)
+type AssetPriceInterface interface {
+    // One call covers both jobs: param.UniqueIDs -> CoinGecko "ids" (prices for known assets,
+    // takes precedence); param.Tickers -> "symbols" (search by ticker) when no UniqueIDs.
+    GetCryptoPrices(ctx context.Context, param entity.GetCryptoPricesParam) ([]entity.CryptoPrice, error)
 }
 ```
 
