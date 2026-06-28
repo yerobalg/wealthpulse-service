@@ -11,6 +11,7 @@ import (
 	"github.com/yerobalg/wealthpulse-service/helper/async"
 	"github.com/yerobalg/wealthpulse-service/helper/cryptolib"
 	"github.com/yerobalg/wealthpulse-service/helper/db"
+	"github.com/yerobalg/wealthpulse-service/helper/httpclient"
 	"github.com/yerobalg/wealthpulse-service/helper/logger"
 
 	"github.com/yerobalg/wealthpulse-service/src/entity"
@@ -30,6 +31,9 @@ import (
 // @in header
 // @name Authorization
 // @value Bearer {token}
+
+// httpClientTimeout caps every outbound market-data request.
+const httpClientTimeout = 10 * time.Second
 
 func main() {
 	loadEnv()
@@ -72,7 +76,17 @@ func initialize() {
 	// async
 	async := async.Init(logger)
 
-	repo := repository.Init(*database)
+	// http client — shared outbound gateway for market-data providers
+	httpClient := httpclient.Init(httpClientTimeout)
+
+	repo := repository.Init(repository.InitParam{
+		DB:         *database,
+		HTTPClient: httpClient,
+		CoinGecko: repository.CoinGeckoConfig{
+			BaseURL: os.Getenv("COINGECKO_BASE_URL"),
+			APIKey:  os.Getenv("COINGECKO_API_KEY"),
+		},
+	})
 	usecase := usecase.Init(usecase.InitParam{
 		Repository: repo,
 		Password:   password,

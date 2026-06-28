@@ -18,6 +18,7 @@ import (
 // result value.
 type Interface interface {
 	GetJSON(ctx context.Context, req Request) (map[string]any, error)
+	GetJSONArray(ctx context.Context, req Request) ([]map[string]any, error)
 	PostJSON(ctx context.Context, req Request) (map[string]any, error)
 }
 
@@ -50,14 +51,45 @@ func Init(timeout time.Duration) Interface {
 }
 
 func (c *client) GetJSON(ctx context.Context, req Request) (map[string]any, error) {
-	return c.do(ctx, http.MethodGet, req)
+	respBody, err := c.do(ctx, http.MethodGet, req)
+	if err != nil || len(respBody) == 0 {
+		return nil, err
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *client) GetJSONArray(ctx context.Context, req Request) ([]map[string]any, error) {
+	respBody, err := c.do(ctx, http.MethodGet, req)
+	if err != nil || len(respBody) == 0 {
+		return nil, err
+	}
+
+	var result []map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (c *client) PostJSON(ctx context.Context, req Request) (map[string]any, error) {
-	return c.do(ctx, http.MethodPost, req)
+	respBody, err := c.do(ctx, http.MethodPost, req)
+	if err != nil || len(respBody) == 0 {
+		return nil, err
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-func (c *client) do(ctx context.Context, method string, req Request) (map[string]any, error) {
+func (c *client) do(ctx context.Context, method string, req Request) ([]byte, error) {
 	fullURL, err := buildURL(req.URL, req.Query)
 	if err != nil {
 		return nil, err
@@ -98,15 +130,7 @@ func (c *client) do(ctx context.Context, method string, req Request) (map[string
 		return nil, &StatusError{StatusCode: resp.StatusCode, Body: truncate(string(respBody), 512)}
 	}
 
-	if len(respBody) == 0 {
-		return nil, nil
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return respBody, nil
 }
 
 func buildURL(rawURL string, query map[string]string) (string, error) {
