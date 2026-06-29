@@ -86,6 +86,10 @@ func initialize() {
 			BaseURL: os.Getenv("COINGECKO_BASE_URL"),
 			APIKey:  os.Getenv("COINGECKO_API_KEY"),
 		},
+		ExchangeRate: repository.ExchangeRateConfig{
+			BaseURL: os.Getenv("EXCHANGERATE_BASE_URL"),
+			AppID:   os.Getenv("EXCHANGERATE_API_KEY"),
+		},
 	})
 	usecase := usecase.Init(usecase.InitParam{
 		Repository: repo,
