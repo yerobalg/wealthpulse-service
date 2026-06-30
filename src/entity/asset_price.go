@@ -35,3 +35,14 @@ type CryptoPrice struct {
 	ImageURL string `json:"imageUrl"`
 	PriceUSD string `json:"priceUsd"`
 }
+
+// StockPrice is one instrument's latest price from Yahoo Finance, covering both
+// US stocks/ETFs (currency USD) and IDX stocks (ticker suffix ".JK", currency
+// IDR). Price is in the instrument's native currency as a decimal string;
+// Timestamp is the provider's quote time in epoch seconds.
+type StockPrice struct {
+	Ticker    string `json:"ticker"`
+	Currency  string `json:"currency"`
+	Price     string `json:"price"`
+	Timestamp int64  `json:"timestamp"`
+}
