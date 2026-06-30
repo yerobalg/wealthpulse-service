@@ -15,7 +15,12 @@ const (
 	coinGeckoVsCurrency   = "usd"
 	coinGeckoAPIKeyHeader = "x-cg-demo-api-key"
 
-	yahooChartPath = "/v8/finance/chart/"
+	yahooChartPath       = "/v8/finance/chart/"
+	yahooSearchPath      = "/v1/finance/search"
+	yahooSearchQuotesMax = "10"
+	yahooQuoteTypeEquity = "EQUITY"
+	yahooQuoteTypeETF    = "ETF"
+	yahooIDXTickerSuffix = ".JK"
 	// yahooUserAgent — Yahoo's unofficial chart endpoint rejects requests without
 	// a browser-like User-Agent (403/429), so every call sends one.
 	yahooUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
@@ -52,6 +57,19 @@ type AssetPriceInterface interface {
 	GetCryptoPrices(ctx context.Context, param entity.GetCryptoPricesParam) ([]entity.CryptoPrice, error)
 	GetStockPrice(ctx context.Context, ticker string) (entity.StockPrice, error)
 	GetUSDIDRRates(ctx context.Context) (entity.USDIDRRate, error)
+	SearchStock(ctx context.Context, param entity.SearchStockParam) ([]entity.StockSearchResult, error)
+}
+
+// stockSearchCriteria maps a requested search type to the Yahoo quote type and
+// market it should keep. A symbol search returns mixed equities/ETFs across
+// markets, so results are filtered down to the one class the caller asked for.
+var stockSearchCriteria = map[string]struct {
+	quoteType string
+	isIDX     bool
+}{
+	entity.StockSearchTypeUSStock:  {quoteType: yahooQuoteTypeEquity, isIDX: false},
+	entity.StockSearchTypeUSETF:    {quoteType: yahooQuoteTypeETF, isIDX: false},
+	entity.StockSearchTypeIDXStock: {quoteType: yahooQuoteTypeEquity, isIDX: true},
 }
 
 type assetPrice struct {
@@ -154,6 +172,34 @@ func (a *assetPrice) GetUSDIDRRates(ctx context.Context) (entity.USDIDRRate, err
 	return toUSDIDRRate(res), nil
 }
 
+// SearchStock looks up instruments by ticker via Yahoo Finance's
+// /v1/finance/search and keeps only the results matching param.Type
+// (us_stock / us_etf / idx_stock). An unknown type yields no results.
+func (a *assetPrice) SearchStock(
+	ctx context.Context,
+	param entity.SearchStockParam,
+) ([]entity.StockSearchResult, error) {
+	criteria, ok := stockSearchCriteria[param.Type]
+	if !ok {
+		return []entity.StockSearchResult{}, nil
+	}
+
+	res, err := a.httpClient.GetJSON(ctx, httpclient.Request{
+		URL:     a.yahoo.BaseURL + yahooSearchPath,
+		Headers: map[string]string{"User-Agent": yahooUserAgent},
+		Query: map[string]string{
+			"q":           param.Ticker,
+			"quotesCount": yahooSearchQuotesMax,
+			"newsCount":   "0",
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return toStockSearchResults(res, criteria.quoteType, criteria.isIDX), nil
+}
+
 func toCryptoPrice(item map[string]any) entity.CryptoPrice {
 	return entity.CryptoPrice{
 		UniqueID: stringFromJSON(item["id"]),
@@ -172,6 +218,35 @@ func toStockPrice(ticker string, res map[string]any) entity.StockPrice {
 		Price:     numberStringFromJSON(meta["regularMarketPrice"]),
 		Timestamp: int64FromJSON(meta["regularMarketTime"]),
 	}
+}
+
+func toStockSearchResults(res map[string]any, quoteType string, isIDX bool) []entity.StockSearchResult {
+	quotes, _ := res["quotes"].([]any)
+	results := make([]entity.StockSearchResult, 0, len(quotes))
+	for _, q := range quotes {
+		quote, _ := q.(map[string]any)
+		symbol := stringFromJSON(quote["symbol"])
+		if stringFromJSON(quote["quoteType"]) != quoteType ||
+			strings.HasSuffix(symbol, yahooIDXTickerSuffix) != isIDX {
+			continue
+		}
+
+		results = append(results, entity.StockSearchResult{
+			Ticker:    symbol,
+			Name:      stockSearchName(quote),
+			Exchange:  stringFromJSON(quote["exchange"]),
+			QuoteType: quoteType,
+		})
+	}
+	return results
+}
+
+// stockSearchName prefers the provider's short name, falling back to the long name.
+func stockSearchName(quote map[string]any) string {
+	if name := stringFromJSON(quote["shortname"]); name != "" {
+		return name
+	}
+	return stringFromJSON(quote["longname"])
 }
 
 func toUSDIDRRate(res map[string]any) entity.USDIDRRate {
