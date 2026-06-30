@@ -15,9 +15,11 @@ type Repository struct {
 }
 
 type InitParam struct {
-	DB         db.DB
-	HTTPClient httpclient.Interface
-	CoinGecko  CoinGeckoConfig
+	DB           db.DB
+	HTTPClient   httpclient.Interface
+	CoinGecko    CoinGeckoConfig
+	YahooFinance YahooFinanceConfig
+	ExchangeRate ExchangeRateConfig
 }
 
 func Init(param InitParam) *Repository {
@@ -27,6 +29,11 @@ func Init(param InitParam) *Repository {
 		Permission:   InitPermission(param.DB),
 		RevokedToken: InitRevokedToken(param.DB),
 		ActivityLog:  InitActivityLog(param.DB),
-		AssetPrice:   InitAssetPrice(param.HTTPClient, param.CoinGecko),
+		AssetPrice: InitAssetPrice(
+			param.HTTPClient,
+			param.CoinGecko,
+			param.YahooFinance,
+			param.ExchangeRate,
+		),
 	}
 }
