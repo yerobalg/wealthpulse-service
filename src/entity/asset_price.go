@@ -54,3 +54,28 @@ type USDIDRRate struct {
 	Rate      string `json:"rate"`
 	Timestamp int64  `json:"timestamp"`
 }
+
+// Stock search types — which instrument class to keep from the provider's
+// symbol search (a ticker matches both EQUITY and ETF results across markets).
+const (
+	StockSearchTypeUSStock  = "us_stock"
+	StockSearchTypeUSETF    = "us_etf"
+	StockSearchTypeIDXStock = "idx_stock"
+)
+
+// SearchStockParam searches Yahoo Finance for instruments matching Ticker,
+// keeping only those of the requested Type (one of the StockSearchType* values).
+type SearchStockParam struct {
+	Ticker string
+	Type   string
+}
+
+// StockSearchResult is one instrument returned by the provider symbol search,
+// carrying the metadata needed to create an asset. QuoteType is the provider's
+// own classification (e.g. "EQUITY", "ETF").
+type StockSearchResult struct {
+	Ticker    string `json:"ticker"`
+	Name      string `json:"name"`
+	Exchange  string `json:"exchange"`
+	QuoteType string `json:"quoteType"`
+}
