@@ -20,6 +20,10 @@ const (
 	// a browser-like User-Agent (403/429), so every call sends one.
 	yahooUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
 		"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+	openExchangeLatestPath = "/latest.json"
+	exchangeRateBaseUSD    = "USD"
+	exchangeRateSymbolIDR  = "IDR"
 )
 
 // CoinGeckoConfig holds the crypto provider base URL and demo API key, read from
@@ -36,23 +40,39 @@ type YahooFinanceConfig struct {
 	BaseURL string
 }
 
+// ExchangeRateConfig holds the Open Exchange Rates base URL and app id (the
+// EXCHANGERATE_API_KEY env value), read from the environment and injected at
+// startup.
+type ExchangeRateConfig struct {
+	BaseURL string
+	AppID   string
+}
+
 type AssetPriceInterface interface {
 	GetCryptoPrices(ctx context.Context, param entity.GetCryptoPricesParam) ([]entity.CryptoPrice, error)
 	GetStockPrice(ctx context.Context, ticker string) (entity.StockPrice, error)
+	GetUSDIDRRates(ctx context.Context) (entity.USDIDRRate, error)
 }
 
 type assetPrice struct {
-	httpClient httpclient.Interface
-	coinGecko  CoinGeckoConfig
-	yahoo      YahooFinanceConfig
+	httpClient   httpclient.Interface
+	coinGecko    CoinGeckoConfig
+	yahoo        YahooFinanceConfig
+	exchangeRate ExchangeRateConfig
 }
 
 func InitAssetPrice(
 	httpClient httpclient.Interface,
 	coinGecko CoinGeckoConfig,
 	yahoo YahooFinanceConfig,
+	exchangeRate ExchangeRateConfig,
 ) AssetPriceInterface {
-	return &assetPrice{httpClient: httpClient, coinGecko: coinGecko, yahoo: yahoo}
+	return &assetPrice{
+		httpClient:   httpClient,
+		coinGecko:    coinGecko,
+		yahoo:        yahoo,
+		exchangeRate: exchangeRate,
+	}
 }
 
 // GetCryptoPrices fetches crypto market data from CoinGecko's /coins/markets.
@@ -114,6 +134,26 @@ func (a *assetPrice) GetStockPrice(ctx context.Context, ticker string) (entity.S
 	return toStockPrice(ticker, res), nil
 }
 
+// GetUSDIDRRates fetches the latest USD→IDR rate from Open Exchange Rates'
+// /latest.json and maps the decoded body onto entity.USDIDRRate.
+func (a *assetPrice) GetUSDIDRRates(ctx context.Context) (entity.USDIDRRate, error) {
+	res, err := a.httpClient.GetJSON(ctx, httpclient.Request{
+		URL: a.exchangeRate.BaseURL + openExchangeLatestPath,
+		Query: map[string]string{
+			"app_id":           a.exchangeRate.AppID,
+			"base":             exchangeRateBaseUSD,
+			"symbols":          exchangeRateSymbolIDR,
+			"prettyprint":      "false",
+			"show_alternative": "false",
+		},
+	})
+	if err != nil {
+		return entity.USDIDRRate{}, err
+	}
+
+	return toUSDIDRRate(res), nil
+}
+
 func toCryptoPrice(item map[string]any) entity.CryptoPrice {
 	return entity.CryptoPrice{
 		UniqueID: stringFromJSON(item["id"]),
@@ -131,6 +171,14 @@ func toStockPrice(ticker string, res map[string]any) entity.StockPrice {
 		Currency:  stringFromJSON(meta["currency"]),
 		Price:     numberStringFromJSON(meta["regularMarketPrice"]),
 		Timestamp: int64FromJSON(meta["regularMarketTime"]),
+	}
+}
+
+func toUSDIDRRate(res map[string]any) entity.USDIDRRate {
+	rates, _ := res["rates"].(map[string]any)
+	return entity.USDIDRRate{
+		Rate:      numberStringFromJSON(rates[exchangeRateSymbolIDR]),
+		Timestamp: int64FromJSON(res["timestamp"]),
 	}
 }
 
@@ -165,4 +213,10 @@ func numberStringFromJSON(v any) string {
 	default:
 		return ""
 	}
+}
+
+// int64FromJSON reads a JSON number (decoded as float64) as an int64.
+func int64FromJSON(v any) int64 {
+	f, _ := v.(float64)
+	return int64(f)
 }
