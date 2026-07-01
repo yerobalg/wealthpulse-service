@@ -35,26 +35,6 @@ func (r *rest) Login(c *gin.Context) {
 	r.SuccessResponse(c, "Login berhasil", res, nil)
 }
 
-// @Summary Logout
-// @Description Logout and revoke the current user token
-// @Tags User
-// @Produce json
-// @Success 200 {object} entity.HTTPResponse{}
-// @Failure 401 {object} entity.HTTPResponse{}
-// @Failure 500 {object} entity.HTTPResponse{}
-// @Security BearerAuth
-// @Router /user/logout [POST]
-func (r *rest) Logout(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	if err := r.usecase.User.Logout(ctx); err != nil {
-		r.ErrorResponse(c, err)
-		return
-	}
-
-	r.SuccessResponse(c, "Logout berhasil", nil, nil)
-}
-
 // @Summary Get Profile
 // @Description Get the authenticated user's profile from token
 // @Tags User
@@ -67,36 +47,6 @@ func (r *rest) GetProfile(c *gin.Context) {
 	ctx := c.Request.Context()
 	res := r.usecase.User.GetProfile(ctx)
 	r.SuccessResponse(c, "Profil berhasil diambil", res, nil)
-}
-
-// @Summary Change Password
-// @Description Change password for authenticated user
-// @Tags User
-// @Accept json
-// @Produce json
-// @Param changePasswordBody body entity.ChangePasswordRequest true "Change password request body"
-// @Success 200 {object} entity.HTTPResponse{}
-// @Failure 400 {object} entity.HTTPResponse{}
-// @Failure 401 {object} entity.HTTPResponse{}
-// @Failure 500 {object} entity.HTTPResponse{}
-// @Security BearerAuth
-// @Router /user/password [PATCH]
-func (r *rest) ChangePassword(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	var changePasswordRequest entity.ChangePasswordRequest
-	if err := r.BindBody(c, &changePasswordRequest); err != nil {
-		r.ErrorResponse(c, err)
-		return
-	}
-
-	err := r.usecase.User.ChangePassword(ctx, changePasswordRequest)
-	if err != nil {
-		r.ErrorResponse(c, err)
-		return
-	}
-
-	r.SuccessResponse(c, "Password berhasil diubah", nil, nil)
 }
 
 // @Summary Update User

@@ -86,8 +86,6 @@ func (r *rest) RegisterMiddlewareAndRoutes() {
 
 	// User management
 	authorized.GET("/user/profile", r.GetProfile)
-	authorized.POST("/user/logout", r.Logout)
-	authorized.PATCH("/user/password", r.ChangePassword)
 	authorized.GET("/user", r.AuthorizePermission(entity.PermissionManageUser), r.GetListUser)
 	authorized.POST("/user", r.AuthorizePermission(entity.PermissionManageUser), r.CreateUser)
 	authorized.PUT("/user/:id", r.AuthorizePermission(entity.PermissionManageUser), r.UpdateUser)
