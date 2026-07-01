@@ -66,46 +66,7 @@ CREATE UNIQUE INDEX idx_users_username ON users (username);
 CREATE INDEX idx_users_deleted_at ON users (deleted_at);
 CREATE INDEX idx_users_role_id ON users (role_id);
 
-CREATE TABLE revoked_tokens (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at  INTEGER NOT NULL DEFAULT 0,
-    updated_at  INTEGER NOT NULL DEFAULT 0,
-    deleted_at  DATETIME NULL,
-    created_by  INTEGER NULL,
-    updated_by  INTEGER NULL,
-    deleted_by  INTEGER NULL,
-    user_id     INTEGER NOT NULL,
-    token       TEXT NOT NULL,
-    expired_at  INTEGER NULL,
-    reason      TEXT NOT NULL,
-    CONSTRAINT fk_revoked_tokens_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-);
-CREATE UNIQUE INDEX idx_revoked_tokens_token ON revoked_tokens (token);
-CREATE INDEX idx_revoked_tokens_user_id ON revoked_tokens (user_id);
-CREATE INDEX idx_revoked_tokens_deleted_at ON revoked_tokens (deleted_at);
-
-CREATE TABLE activity_logs (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at        INTEGER NOT NULL DEFAULT 0,
-    updated_at        INTEGER NOT NULL DEFAULT 0,
-    deleted_at        DATETIME NULL,
-    created_by        INTEGER NULL,
-    updated_by        INTEGER NULL,
-    deleted_by        INTEGER NULL,
-    user_id           INTEGER NOT NULL,
-    user_token        TEXT NOT NULL,
-    metadata          TEXT NOT NULL,
-    activity_event    TEXT NOT NULL,
-    activity_name     TEXT NOT NULL,
-    additional_fields TEXT NULL,
-    CONSTRAINT fk_activity_logs_user FOREIGN KEY (user_id) REFERENCES users (id)
-);
-CREATE INDEX idx_activity_logs_user_id ON activity_logs (user_id);
-CREATE INDEX idx_activity_logs_deleted_at ON activity_logs (deleted_at);
-
 -- +goose Down
-DROP TABLE IF EXISTS activity_logs;
-DROP TABLE IF EXISTS revoked_tokens;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS role_permissions;
 DROP TABLE IF EXISTS permissions;
