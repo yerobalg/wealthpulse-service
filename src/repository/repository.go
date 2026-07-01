@@ -6,12 +6,10 @@ import (
 )
 
 type Repository struct {
-	User         UserInterface
-	Role         RoleInterface
-	Permission   PermissionInterface
-	RevokedToken RevokedTokenInterface
-	ActivityLog  ActivityLogInterface
-	AssetPrice   AssetPriceInterface
+	User       UserInterface
+	Role       RoleInterface
+	Permission PermissionInterface
+	AssetPrice AssetPriceInterface
 }
 
 type InitParam struct {
@@ -24,11 +22,9 @@ type InitParam struct {
 
 func Init(param InitParam) *Repository {
 	return &Repository{
-		User:         InitUser(param.DB),
-		Role:         InitRole(param.DB),
-		Permission:   InitPermission(param.DB),
-		RevokedToken: InitRevokedToken(param.DB),
-		ActivityLog:  InitActivityLog(param.DB),
+		User:       InitUser(param.DB),
+		Role:       InitRole(param.DB),
+		Permission: InitPermission(param.DB),
 		AssetPrice: InitAssetPrice(
 			param.HTTPClient,
 			param.CoinGecko,
