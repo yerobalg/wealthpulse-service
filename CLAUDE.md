@@ -1,29 +1,5 @@
 # Development Guidelines
 
-## Activity Logging
-
-Every usecase that performs **insert, update, delete, or sensitive-read** operations must end with a call to `activityLog.Log(...)`.
-
-**Rules:**
-- Place the `Log` call **after** any DB transaction commits — never inside the tx. A failed log write must not roll back a successful business write.
-- Use `context.WithoutCancel(ctx)` so the log is not aborted when the HTTP request finishes.
-- Populate `ActivityEvent` (`Type`, `Category`, `Action`, `Outcome`), `ActivityName` (human-readable Indonesian string), and `AdditionalFields` (relevant IDs and before/after values for updates).
-- If the `usecase` struct does not yet have an `activityLog ActivityLogInterface` field, add it to both the struct and its `InitParam`, then wire it up in [src/usecase/usecase.go](src/usecase/usecase.go) `Init()`.
-
-**`AuditLogEventAction` must follow the OWASP application-security logging vocabulary.** Never introduce per-resource `*_created`, `*_updated`, `*_deleted` actions for business resources. For CRUD on business data, use the existing OWASP constants in [helper/logger/audit_log.go](helper/logger/audit_log.go):
-- Create → `SensitiveCreateEventAction` (`sensitive_create`)
-- Read   → `SensitiveReadEventAction` (`sensitive_read`)
-- Update → `SensitiveUpdateEventAction` (`sensitive_update`)
-- Delete → `SensitiveDeleteEventAction` (`sensitive_delete`)
-
-The resource being acted on (e.g. "user", "item") belongs in `ActivityName` (human-readable) and `AdditionalFields` (IDs, before/after values) — **not** in the action constant.
-
-Only add a new `AuditLogEventAction` if it represents an OWASP event class that is genuinely missing from `audit_log.go`. Existing non-OWASP constants like `UserCreatedEventAction` / `UserUpdatedEventAction` are legacy; do not propagate that pattern.
-
-Specs / issue.md write-ups for these usecases must include the activity-log step in both the flow description and the acceptance checklist.
-
-**Reference implementations:** [src/usecase/item.go](src/usecase/item.go) `Create` / `Update` / `Delete`, [src/usecase/user.go](src/usecase/user.go) `Login` / `ChangePassword` / `CreateUser`.
-
 ## Pagination
 
 All paginated list endpoints follow the pattern established in `GetListItem` / [src/repository/item.go](src/repository/item.go) `GetList` (and [src/repository/user.go](src/repository/user.go) `GetListWithRole` for the joined-relation variant).
@@ -51,7 +27,7 @@ Returns `([]entity.Xxx, *entity.PaginationResponse, error)`.
 
 **`searchColumn` must be table-qualified** (e.g. `"items.name"`) when the data query has joins, to avoid ambiguous column errors.
 
-**Usecase** — signature returns `([]XxxResponse, *entity.PaginationResponse, error)`. Extract per-row response mapping into a `toXxxListResponse` helper to keep cognitive complexity ≤ 15. Read-only list usecases do **not** emit an activity log.
+**Usecase** — signature returns `([]XxxResponse, *entity.PaginationResponse, error)`. Extract per-row response mapping into a `toXxxListResponse` helper to keep cognitive complexity ≤ 15.
 
 **Handler** — pass `pagination` from usecase into `SuccessResponse`. Use `Enums(...)` in swagger `@Param` for `search_by`:
 ```go
@@ -347,7 +323,7 @@ When reviewing changes, grep for `TODO(` and `TODO:` and surface a list before d
 
 Every PR file under `docs/pr/` must include a **Test Plan** section written in **English**. Place it between the Changes section and the Checklist section.
 
-The test plan is a markdown checklist covering all meaningful scenarios: happy path, error paths (not found, unauthorized, conflict/duplicate), edge cases (optional fields omitted), and any side-effects (activity log entries written).
+The test plan is a markdown checklist covering all meaningful scenarios: happy path, error paths (not found, unauthorized, conflict/duplicate), edge cases (optional fields omitted), and any side-effects.
 
 `docs/pr/` ships empty in the boilerplate — create the first PR file when you land your first feature, following the structure above.
 

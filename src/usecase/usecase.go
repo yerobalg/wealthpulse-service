@@ -16,9 +16,7 @@ type TransactionManager interface {
 }
 
 type Usecase struct {
-	User         UserInterface
-	ActivityLog  ActivityLogInterface
-	RevokedToken RevokedTokenInterface
+	User UserInterface
 }
 
 type InitParam struct {
@@ -31,24 +29,16 @@ type InitParam struct {
 }
 
 func Init(param InitParam) *Usecase {
-	activityLog := InitActivityLog(param.Repository.ActivityLog, param.Async, param.Log)
-	validator := validator.Init()
-
 	userParam := UserInitParam{
-		UserRepo:         param.Repository.User,
-		RoleRepo:         param.Repository.Role,
-		PermissionRepo:   param.Repository.Permission,
-		RevokedTokenRepo: param.Repository.RevokedToken,
-		Password:         param.Password,
-		JWT:              param.JWT,
-		ActivityLog:      activityLog,
-		Validator:        validator,
-		TxManager:        param.TxManager,
+		UserRepo:       param.Repository.User,
+		RoleRepo:       param.Repository.Role,
+		PermissionRepo: param.Repository.Permission,
+		Password:       param.Password,
+		JWT:            param.JWT,
+		Validator:      validator.Init(),
 	}
 
 	return &Usecase{
-		User:         InitUser(userParam),
-		ActivityLog:  activityLog,
-		RevokedToken: InitRevokedToken(param.Repository.RevokedToken),
+		User: InitUser(userParam),
 	}
 }

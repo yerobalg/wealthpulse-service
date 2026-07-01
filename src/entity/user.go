@@ -81,10 +81,6 @@ type UserLoginResponse struct {
 	AccessToken string               `json:"accessToken"`
 }
 
-type ChangePasswordRequest struct {
-	NewPassword string `json:"newPassword" validate:"required,min=8,printascii,containsany=0123456789,containsany=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"`
-}
-
 // EnsureSuperuserRequest carries the single-owner credentials read from the
 // environment at startup. PasswordHash is an already-bcrypt-hashed value (read
 // verbatim via os.Getenv, so the '$' in the hash needs no escaping) and is stored

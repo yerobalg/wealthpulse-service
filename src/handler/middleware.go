@@ -10,9 +10,6 @@ import (
 	"github.com/yerobalg/wealthpulse-service/helper/appcontext"
 	"github.com/yerobalg/wealthpulse-service/helper/authcontext"
 	"github.com/yerobalg/wealthpulse-service/helper/errors"
-	"github.com/yerobalg/wealthpulse-service/helper/types"
-
-	"github.com/yerobalg/wealthpulse-service/src/entity"
 )
 
 // timeout middleware wraps the request context with a timeout
@@ -72,12 +69,6 @@ func (r *rest) checkToken(ctx *gin.Context) {
 	jwtToken := header[len("Bearer "):]
 	tokenClaims, err := r.jwt.Decode(jwtToken)
 	if err != nil {
-		if errors.GetMessage(err) == "Token expired" {
-			bgCtx := context.WithoutCancel(ctx.Request.Context())
-			r.async.Run(bgCtx, func() {
-				r.revokeExpiredToken(bgCtx, tokenClaims, jwtToken)
-			})
-		}
 		r.ErrorResponse(ctx, errors.Unauthorized("Token tidak valid"))
 		ctx.Abort()
 		return
@@ -85,13 +76,6 @@ func (r *rest) checkToken(ctx *gin.Context) {
 
 	data, ok := tokenClaims["data"].(map[string]any)
 	if !ok {
-		r.ErrorResponse(ctx, errors.Unauthorized("Token tidak valid"))
-		ctx.Abort()
-		return
-	}
-
-	isRevoked, err := r.usecase.RevokedToken.IsTokenRevoked(ctx.Request.Context(), jwtToken)
-	if err != nil || isRevoked {
 		r.ErrorResponse(ctx, errors.Unauthorized("Token tidak valid"))
 		ctx.Abort()
 		return
@@ -102,29 +86,6 @@ func (r *rest) checkToken(ctx *gin.Context) {
 	ctx.Request = ctx.Request.WithContext(c)
 
 	ctx.Next()
-}
-
-func (r *rest) revokeExpiredToken(ctx context.Context, tokenClaims map[string]any, jwtToken string) {
-	data, ok := tokenClaims["data"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	id, ok := data["id"].(float64)
-	if !ok {
-		return
-	}
-
-	var expiredAt *int64
-	if exp, ok := tokenClaims["exp"].(float64); ok {
-		expiredAt = types.SafelyReference(int64(exp))
-	}
-
-	c := authcontext.SetUserDirect(ctx, authcontext.User{
-		ID:        int64(id),
-		UserToken: jwtToken,
-	})
-	r.usecase.RevokedToken.RevokeToken(c, entity.RevokedTokenReasonExpired, expiredAt)
 }
 
 func (r *rest) AuthorizeRole(roleCode string) gin.HandlerFunc {

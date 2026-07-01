@@ -6,7 +6,6 @@ import (
 	"github.com/yerobalg/wealthpulse-service/helper/authcontext"
 	"github.com/yerobalg/wealthpulse-service/helper/cryptolib"
 	errorLib "github.com/yerobalg/wealthpulse-service/helper/errors"
-	"github.com/yerobalg/wealthpulse-service/helper/logger"
 	"github.com/yerobalg/wealthpulse-service/helper/types"
 	"github.com/yerobalg/wealthpulse-service/helper/validator"
 
@@ -17,8 +16,6 @@ import (
 
 type UserInterface interface {
 	Login(ctx context.Context, userLoginRequest entity.UserLoginRequest) (entity.UserLoginResponse, error)
-	ChangePassword(ctx context.Context, changePasswordRequest entity.ChangePasswordRequest) error
-	Logout(ctx context.Context) error
 	GetProfile(ctx context.Context) authcontext.User
 	CreateUser(ctx context.Context, req entity.CreateUserRequest) (entity.User, error)
 	UpdateUser(ctx context.Context, req entity.UpdateUserRequest) error
@@ -27,40 +24,31 @@ type UserInterface interface {
 }
 
 type user struct {
-	userRepo         repository.UserInterface
-	roleRepo         repository.RoleInterface
-	permissionRepo   repository.PermissionInterface
-	revokedTokenRepo repository.RevokedTokenInterface
-	password         cryptolib.PasswordInterface
-	jwt              cryptolib.JWTInterface
-	activityLog      ActivityLogInterface
-	validator        validator.Interface
-	txManager        TransactionManager
+	userRepo       repository.UserInterface
+	roleRepo       repository.RoleInterface
+	permissionRepo repository.PermissionInterface
+	password       cryptolib.PasswordInterface
+	jwt            cryptolib.JWTInterface
+	validator      validator.Interface
 }
 
 type UserInitParam struct {
-	UserRepo         repository.UserInterface
-	RoleRepo         repository.RoleInterface
-	PermissionRepo   repository.PermissionInterface
-	RevokedTokenRepo repository.RevokedTokenInterface
-	Password         cryptolib.PasswordInterface
-	JWT              cryptolib.JWTInterface
-	ActivityLog      ActivityLogInterface
-	Validator        validator.Interface
-	TxManager        TransactionManager
+	UserRepo       repository.UserInterface
+	RoleRepo       repository.RoleInterface
+	PermissionRepo repository.PermissionInterface
+	Password       cryptolib.PasswordInterface
+	JWT            cryptolib.JWTInterface
+	Validator      validator.Interface
 }
 
 func InitUser(param UserInitParam) UserInterface {
 	return &user{
-		userRepo:         param.UserRepo,
-		roleRepo:         param.RoleRepo,
-		permissionRepo:   param.PermissionRepo,
-		revokedTokenRepo: param.RevokedTokenRepo,
-		password:         param.Password,
-		jwt:              param.JWT,
-		activityLog:      param.ActivityLog,
-		validator:        param.Validator,
-		txManager:        param.TxManager,
+		userRepo:       param.UserRepo,
+		roleRepo:       param.RoleRepo,
+		permissionRepo: param.PermissionRepo,
+		password:       param.Password,
+		jwt:            param.JWT,
+		validator:      param.Validator,
 	}
 }
 
@@ -114,79 +102,7 @@ func (u *user) Login(ctx context.Context, userLoginRequest entity.UserLoginReque
 		AccessToken: token,
 	}
 
-	logCtx := authcontext.SetUserDirect(context.WithoutCancel(ctx), authcontext.User{
-		ID:        user.ID,
-		UserToken: token,
-	})
-	u.activityLog.Log(logCtx, entity.ActivityLogInsertRequest{
-		ActivityEvent: logger.AuditLogEvent{
-			Type:     []logger.AuditLogEventType{logger.StartType},
-			Category: []logger.AuditLogEventCategory{logger.AuthCategory},
-			Action:   logger.LoginSuccessEventAction,
-			Outcome:  logger.SuccessEventOutcome,
-		},
-		ActivityName: "Login",
-	})
-
 	return userResponse, nil
-}
-
-func (u *user) ChangePassword(ctx context.Context, changePasswordRequest entity.ChangePasswordRequest) error {
-	if err := u.validator.Bind(changePasswordRequest, validation.Password("newPassword", "Password baru")); err != nil {
-		return err
-	}
-
-	authUser := authcontext.GetUser(ctx)
-
-	userQuery := entity.UserRequest{
-		ID: authUser.ID,
-	}
-
-	user, err := u.userRepo.Get(ctx, userQuery)
-	if errorLib.Is(err, errorLib.TypeNotFound) {
-		return errorLib.Unauthorized(UsernameOrPasswordWrong)
-	} else if err != nil {
-		return err
-	}
-
-	newPasswordHash, err := u.password.Hash(changePasswordRequest.NewPassword)
-	if err != nil {
-		return err
-	}
-
-	user.Password = newPasswordHash
-
-	logActivityName := "Mengganti password"
-	if !types.SafelyDereference(user.HasChangedPassword) {
-		logActivityName += " untuk pertama kali"
-	}
-	user.HasChangedPassword = types.SafelyReference(true)
-
-	if err := u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if err := u.userRepo.Update(txCtx, userQuery, user); err != nil {
-			return err
-		}
-
-		return u.revokedTokenRepo.Create(txCtx, entity.RevokedToken{
-			UserID: authUser.ID,
-			Token:  authUser.UserToken,
-			Reason: entity.RevokedTokenReasonPasswordChanged,
-		})
-	}); err != nil {
-		return err
-	}
-
-	u.activityLog.Log(context.WithoutCancel(ctx), entity.ActivityLogInsertRequest{
-		ActivityEvent: logger.AuditLogEvent{
-			Type:     []logger.AuditLogEventType{logger.ChangeType},
-			Category: []logger.AuditLogEventCategory{logger.AuthCategory},
-			Action:   logger.PasswordChangeEventAction,
-			Outcome:  logger.SuccessEventOutcome,
-		},
-		ActivityName: logActivityName,
-	})
-
-	return nil
 }
 
 func (u *user) GetProfile(ctx context.Context) authcontext.User {
@@ -223,16 +139,6 @@ func (u *user) CreateUser(ctx context.Context, req entity.CreateUserRequest) (en
 	if err := u.userRepo.Create(ctx, &newUser); err != nil {
 		return entity.User{}, err
 	}
-
-	u.activityLog.Log(context.WithoutCancel(ctx), entity.ActivityLogInsertRequest{
-		ActivityEvent: logger.AuditLogEvent{
-			Type:     []logger.AuditLogEventType{logger.CreationType},
-			Category: []logger.AuditLogEventCategory{logger.IAMCategory},
-			Action:   logger.SensitiveCreateEventAction,
-			Outcome:  logger.SuccessEventOutcome,
-		},
-		ActivityName: "Menambahkan pengguna: " + req.Username,
-	})
 
 	return newUser, nil
 }
@@ -344,31 +250,5 @@ func (u *user) UpdateUser(ctx context.Context, req entity.UpdateUserRequest) err
 		return err
 	}
 
-	u.activityLog.Log(context.WithoutCancel(ctx), entity.ActivityLogInsertRequest{
-		ActivityEvent: logger.AuditLogEvent{
-			Type:     []logger.AuditLogEventType{logger.ChangeType},
-			Category: []logger.AuditLogEventCategory{logger.IAMCategory},
-			Action:   logger.SensitiveUpdateEventAction,
-			Outcome:  logger.SuccessEventOutcome,
-		},
-		ActivityName: "Memperbarui pengguna: " + req.Username,
-		AdditionalFields: map[string]any{
-			"userId":     req.ID,
-			"isInactive": req.IsInactive,
-		},
-	})
-
 	return nil
-}
-
-func (u *user) Logout(ctx context.Context) error {
-	authUser := authcontext.GetUser(ctx)
-
-	return u.revokedTokenRepo.Create(ctx, entity.RevokedToken{
-		UserID:    authUser.ID,
-		Token:     authUser.UserToken,
-		Reason:    entity.RevokedTokenReasonLogout,
-		CreatedBy: &authUser.ID,
-		UpdatedBy: &authUser.ID,
-	})
 }
